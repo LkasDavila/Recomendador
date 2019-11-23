@@ -1,0 +1,51 @@
+create table regras (
+x int not null,
+y int not null,
+freq_x float,
+freq_xy float )
+
+DELIMITER $$
+DROP PROCEDURE IF EXISTS `betao`.`sp_apriori` $$
+CREATE PROCEDURE `sp_apriori`(in sup_min integer,in conf integer)
+begin
+    delete from regras;
+    select @total:=count(distinct trans) as total from vendas;
+    /* criacao da tabela temporaria para um item */
+    create temporary table 1_item(
+    id int not null auto_increment primary key,
+    prdno int not null,
+    freq float not null);
+    /* inserindo na tabela temporaria os 1 itens de acordo com o suporte minimo definido no parametro de entrada */
+   
+    insert into 1_item(prdno,freq) select prdno,ROUND(100*count(prdno)/@total,2) as freq
+    from vendas
+    group by prdno
+    having freq >= sup_min;
+   
+    select @total_aux:=count(*) from 1_item;
+    set @i:=1;
+   
+     /* nesse while verifico as associacoes dos 1 itens classificados acima */
+    while @i <= @total_aux do
+      select @cod:=prdno,@freqx:=freq from 1_item where id=@i;
+      insert into regras
+      select @cod,prdno,@freqx,ROUND(100*count(prdno)/@total,2) as freq
+      from vendas where trans in(select trans from vendas where prdno=@cod)
+      and prdno <> @cod group by prdno having freq >=sup_min; /*nessa linha filtro os produtos que sairam com o outro produto
+      set @i:=@i+1;
+    end while;
+/* seleciona as regras que estao dentro da confianca passada como parametro, ou seja, deleta aquelas que nao interessam */
+    delete from regras where (freq_xy/freq_x) < (conf/100);
+  end $$
+DELIMITER ;
+ 
+ 
+
+ 
+ 
+ 
+Chamando algoritmo com suporte minimo de 30% e confiança de 70%
+ 
+Para chamar o algoritmo no cliente do mysql executar:
+ 
+Call sp_apriori(30,70);
